@@ -138,12 +138,26 @@
 #define LIGHTWEIGHT 0
 #endif
 
+#ifdef AREST_NUMBER_STRINGS
+#define NUMBER_STRINGS AREST_NUMBER_STRINGS
+#endif
+
+
 #ifdef AREST_NUMBER_VARIABLES
 #define NUMBER_VARIABLES AREST_NUMBER_VARIABLES
 #endif
 
 #ifdef AREST_NUMBER_FUNCTIONS
 #define NUMBER_FUNCTIONS AREST_NUMBER_FUNCTIONS
+#endif
+
+// Default number of max. exposed strings
+#ifndef NUMBER_STRINGS
+  #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(CORE_WILDFIRE) || defined(ESP8266)|| defined(ESP32) || !defined(ADAFRUIT_CC3000_H)
+  #define NUMBER_STRINGS 30
+  #else
+  #define NUMBER_STRINGS 10
+  #endif
 #endif
 
 // Default number of max. exposed variables
@@ -213,6 +227,22 @@ void variable(const char *name, T *var, bool quotable) {
   variables[variables_index] = new TypedVariable<T>(var, quotable);
   variable_names[variables_index] = name;
   variables_index++;
+}
+
+void array_name(const char * name){
+  array_strings_name = name;
+  name_was_set = true;
+}
+
+void add_array_string(const char * value){
+  array_strings[array_strings_index] = value;
+  array_strings_index++;
+}
+
+void change_array_string(const char * value, unsigned int index){
+  if(index <= array_strings_index){
+    array_strings[index] = value;
+  }
 }
 
 template<typename T>
@@ -1566,6 +1596,8 @@ virtual void root_answer() {
     addToBufferF(F("}, "));
   }
 
+  addArraytoBuffer();
+
   // End
   addHardwareToBuffer();
 
@@ -1922,6 +1954,20 @@ void addVariableToBuffer(uint8_t index) {
   variables[index]->addToBuffer(this);
 }
 
+void addArraytoBuffer(){
+  //if name was set
+  if(name_was_set){
+    addStringToBuffer(array_strings_name, true);
+    addToBufferF(F(": [ "));
+    for (int i = 0; i < array_strings_index-1; i++){
+      addStringToBuffer(array_strings[i], true);
+      addToBufferF(F(", "));
+    }
+    addStringToBuffer(array_strings[array_strings_index-1], true);
+    addToBufferF(F(" ], "));
+  }
+}
+
 
 void addHardwareToBuffer() {
   addToBufferF(F("\"id\": "));
@@ -1989,6 +2035,12 @@ private:
   uint8_t variables_index;
   Variable* variables[NUMBER_VARIABLES];
   const char * variable_names[NUMBER_VARIABLES];
+
+  // Array of strings (it wont be changed)
+  boolean name_was_set; 
+  uint8_t array_strings_index;
+  const char * array_strings_name;
+  const char * array_strings[NUMBER_STRINGS];
 
   // MQTT client
   #if defined(PubSubClient_h)
